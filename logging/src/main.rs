@@ -16,11 +16,16 @@ pub struct Logger {
 #[tonic::async_trait]
 impl LoggingService for Logger {
     async fn add_log(&self, request: Request<Log>) -> Result<Response<AddLogResponse>, Status> {
-        println!("Got a request to add log: {:?}", request);
-
-        // Lock the mutex to modify the logs
-        let mut logs = self.logs.lock().unwrap();
+        let mut logs = match self.logs.lock() {
+            Ok(logs) => logs,
+            Err(_) => {
+                println!("Got a request to add log, but failed to access logs");
+                return Err(Status::internal("Failed to add log"));
+            }
+        };
         let log = request.into_inner();
+        println!("Got a request to add log: ({:?}, {:?})", log.uuid, log.message);
+
         logs.insert(log.uuid.clone(), log);
 
         Ok(Response::new(AddLogResponse { success: true }))
@@ -29,8 +34,15 @@ impl LoggingService for Logger {
         &self,
         request: Request<GetLogsRequest>,
     ) -> Result<Response<LogsString>, Status> {
-        println!("Got a request to get logs: {:?}", request);
-        let logs = self.logs.lock().unwrap();
+        print!("Got a request to get logs: ");
+        let logs = match self.logs.lock() {
+            Ok(logs) => logs,
+            Err(_) => {
+                println!("Failed to access logs for a request: {:?}", request);
+                return Err(Status::internal("Failed to get logs"));
+            }
+        };
+        println!("Success");
         Ok(Response::new(LogsString {
             logs_string: logs
                 .values()
