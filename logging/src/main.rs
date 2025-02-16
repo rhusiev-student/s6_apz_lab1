@@ -26,7 +26,11 @@ impl LoggingService for Logger {
         let log = request.into_inner();
         println!("Got a request to add log: ({:?}, {:?})", log.uuid, log.message);
 
-        logs.insert(log.uuid.clone(), log);
+        if logs.contains_key(&log.uuid) {
+            return Err(Status::already_exists("Log already exists"));
+        } else {
+            logs.insert(log.uuid.clone(), log);
+        }
 
         Ok(Response::new(AddLogResponse { success: true }))
     }
